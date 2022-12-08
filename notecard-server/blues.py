@@ -7,7 +7,6 @@ import time
 
 import serial
 import notecard
-from notecard import hub
 
 class Notecard:
 
@@ -26,22 +25,23 @@ class Notecard:
         # via the notecard.
         threading.Thread(target=self.upload_timer, daemon=True).start()
 
-        # create a Notecard object using the company Notecard library
-        # Use pySerial on a PC or SBC
-        port = serial.Serial("/dev/ttyUSB0", 9600)
-        self.nCard = notecard.OpenSerial(port)
+        # Set the mode and other startup parameters on the Notecard
+        with serial.Serial("/dev/ttyUSB0", 9600) as port:
+            card = notecard.OpenSerial(port)
 
-        productUID = "com.analysisnorth:sensor"
-        rsp = hub.set(self.nCard, productUID, mode="continuous")
-        print(rsp)
+            req = dict(
+                req = 'hub.set',
+                productUID = "com.gmail.tabb99:test",
+                sn='burton_158', 
+                mode="continuous",
+                outbound=360,
+                inbound=360
+            )
+            card.Transaction(req)
 
     def add_sensor_reading(self, ts, sensor_id, val):
         """Adds a sensor reading to the Queue that will get uploaded via the Notecard.
         """
-        # TO DO: Adjust time here if Notecard time is more than 5 seconds different
-        # than computer time. This assumes these readings originated on this computer.
-        pass
-
         # add this sensor readings to the queue
         self.q.put( (ts, sensor_id, val) )
 
@@ -57,6 +57,34 @@ class Notecard:
 
     def upload(self):
 
-        while not self.q.empty():
-            rec = self.q.get()
-            print(f'uploading {rec}')
+        print('uploading...')
+        with serial.Serial("/dev/ttyUSB0", 9600) as port:
+            card = notecard.OpenSerial(port)
+
+            # Determine whether a time adjustment should be made for the readings.
+            # We may be operating on a Pi where the clock is off due to no network
+            # connectivity.
+            # Note that this code assumes that all the sensor readings were time-stamped
+            # by this computer, so all of the readings have a time problem.
+            cur_notecard_time = card.Transaction({'req': 'card.time'})['time']
+            time_adj = cur_notecard_time - time.time()
+
+            # only adjust time if it is off by more than 5 seconds
+            if abs(time_adj) < 5:
+                print('no time adjustment')
+                time_adj = 0.0
+
+            readings = []
+            while not self.q.empty():
+                ts, sensor_id, val = self.q.get()
+                ts = round(ts + time_adj, 1)    # adjust and round to tenth of secs
+                readings.append( (ts, sensor_id, val) )
+            
+            # TO DO: should implement some compression here
+            req = dict(
+                req = 'note.add',
+                body = {'readings': readings}
+            )
+            resp = card.Transaction(req)
+            print(resp)
+            card.Transaction({'req': 'hub.sync'})
