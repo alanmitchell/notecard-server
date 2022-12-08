@@ -1,0 +1,5 @@
+bottle==0.12.23
+pyserial==3.5
+note-python==1.4.6
+filelock==3.8.2
+python-periphery==2.3.0
