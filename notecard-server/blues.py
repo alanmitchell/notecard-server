@@ -30,13 +30,14 @@ class Notecard:
                 card = self.open_card()
                 req = dict(
                     req = 'hub.set',
-                    productUID = product_uid,
+                    product = product_uid,
                     sn=sn_string, 
                     mode="continuous",
                     outbound=720,
                     inbound=720
                 )
                 card.Transaction(req)
+                card.Transaction({'req': 'hub.sync'})
                 break
 
             except Exception as e:
