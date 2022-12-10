@@ -4,13 +4,39 @@ Wireless Notecard.
 import queue
 import threading
 import time
+import base64
+import bz2
 
 import serial
+from periphery import I2C
 import notecard
+
 
 class Notecard:
 
-    def __init__(self, upload_period):
+    def __init__(self, upload_period, port_name, product_uid, sn_string):
+
+        self.port_name = port_name
+
+        # Set the mode and other startup parameters on the Notecard
+        while True:
+            try:
+                card = self.open_card()
+                req = dict(
+                    req = 'hub.set',
+                    productUID = product_uid,
+                    sn=sn_string, 
+                    mode="continuous",
+                    outbound=720,
+                    inbound=720
+                )
+                card.Transaction(req)
+                break
+
+            except Exception as e:
+                print("Couldn't complete Notecard setup. Retrying...", e)
+                # try again
+                time.sleep(3)
 
         # The time between requesting a Notecard sync to upload sensor readings.
         # The units are minutes.
@@ -25,19 +51,28 @@ class Notecard:
         # via the notecard.
         threading.Thread(target=self.upload_timer, daemon=True).start()
 
-        # Set the mode and other startup parameters on the Notecard
-        with serial.Serial("/dev/ttyUSB0", 9600) as port:
-            card = notecard.OpenSerial(port)
+    def open_card(self):
+        """Creates a notecard object using communication on the port identified
+        on self.port_name.  Retries until a connection is made.  Returns the 
+        card object.
+        """
+        is_i2c = 'i2c' in self.port_name
 
-            req = dict(
-                req = 'hub.set',
-                productUID = "com.gmail.tabb99:test",
-                sn='burton_158', 
-                mode="continuous",
-                outbound=360,
-                inbound=360
-            )
-            card.Transaction(req)
+        # keep trying to connect
+        while True:
+            try:
+                if is_i2c:
+                    port = I2C(self.port_name)
+                    return notecard.OpenI2C(port, 0, 0)
+
+                else:
+                    port = serial.Serial(self.port_name, 9600)
+                    return notecard.OpenSerial(port)
+
+            except Exception as e:
+                print("Couldn't open Notecard port. Trying again...", e)
+                # go back and try again.
+                time.sleep(3)
 
     def add_sensor_reading(self, ts, sensor_id, val):
         """Adds a sensor reading to the Queue that will get uploaded via the Notecard.
@@ -51,40 +86,54 @@ class Notecard:
         """
         while True:
             if time.time() >= self.next_upload and not self.q.empty():
-                self.next_upload += self.upload_period * 60.0
-                self.upload()
+                while True:
+                    try:
+                        self.upload()
+                        self.next_upload = time.time() + self.upload_period * 60.0
+                        break
+
+                    except Exception as e:
+                        print('Error uploading readings. Trying again...', e)
+                        time.sleep(3)
+
             time.sleep(2)     # check every two seconds
 
     def upload(self):
-
+        """Create a Note containting all the queued readings and uploads to the
+        Note Hub.
+        Calling routine is responsible for handling errors.
+        """
         print('uploading...')
-        with serial.Serial("/dev/ttyUSB0", 9600) as port:
-            card = notecard.OpenSerial(port)
 
-            # Determine whether a time adjustment should be made for the readings.
-            # We may be operating on a Pi where the clock is off due to no network
-            # connectivity.
-            # Note that this code assumes that all the sensor readings were time-stamped
-            # by this computer, so all of the readings have a time problem.
-            cur_notecard_time = card.Transaction({'req': 'card.time'})['time']
-            time_adj = cur_notecard_time - time.time()
+        card = self.open_card()
 
-            # only adjust time if it is off by more than 5 seconds
-            if abs(time_adj) < 5:
-                print('no time adjustment')
-                time_adj = 0.0
+        # Determine whether a time adjustment should be made for the readings.
+        # We may be operating on a Pi where the clock is off due to no network
+        # connectivity.
+        # Note that this code assumes that all the sensor readings were time-stamped
+        # by this computer, so all of the readings have a time problem.
+        cur_notecard_time = card.Transaction({'req': 'card.time'})['time']
+        time_adj = cur_notecard_time - time.time()
 
-            readings = []
-            while not self.q.empty():
-                ts, sensor_id, val = self.q.get()
-                ts = round(ts + time_adj, 1)    # adjust and round to tenth of secs
-                readings.append( (ts, sensor_id, val) )
-            
-            # TO DO: should implement some compression here
-            req = dict(
-                req = 'note.add',
-                body = {'readings': readings}
-            )
-            resp = card.Transaction(req)
-            print(resp)
-            card.Transaction({'req': 'hub.sync'})
+        # only adjust time if it is off by more than 5 seconds
+        if abs(time_adj) < 5:
+            time_adj = 0.0
+
+        readings = []
+        while not self.q.empty():
+            ts, sensor_id, val = self.q.get()
+            ts = round(ts + time_adj, 1)    # adjust and round to tenth of secs
+            readings.append( (ts, sensor_id, val) )
+
+        # Compress the new readings array by converting to a string, implementing
+        # bz2 compression and then convert to a base64 string.
+        reads_compressed = bz2.compress(str(readings).encode('utf-8'))
+        reads_b64 = base64.b64encode(reads_compressed).decode('utf-8')
+
+        req = dict(
+            req = 'note.add',
+            body = {'reading_type': 'ts_id_val', 'readings': reads_b64}
+        )
+        resp = card.Transaction(req)
+        print(resp)
+        card.Transaction({'req': 'hub.sync'})

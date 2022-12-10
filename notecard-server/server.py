@@ -2,7 +2,12 @@ from bottle import run, request, post
 
 import blues
 
-nCard = blues.Notecard(0.5)
+nCard = blues.Notecard(
+    0.5, 
+    '/dev/ttyUSB0',
+    "com.gmail.tabb99:test",
+    'Okla511'
+    )
 
 @post('/minimon')
 def mini_data():
