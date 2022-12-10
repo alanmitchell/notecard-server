@@ -15,6 +15,12 @@ import notecard
 class Notecard:
 
     def __init__(self, upload_period, port_name, product_uid, sn_string):
+        """upload_period:  amount of time in minutes between uploads to Note Hub.
+                              Readings are batched in between uploads.
+        port_name:   e.g. '/dev/ttyUSB0' or '/dev/i2c-1'
+        product_uid:  The Product UID on Note Hub where the data should go.
+        sn_string:  the serial number string that identifies this Notecard, you create it.
+        """
 
         self.port_name = port_name
 
@@ -55,6 +61,8 @@ class Notecard:
         """Creates a notecard object using communication on the port identified
         on self.port_name.  Retries until a connection is made.  Returns the 
         card object.
+        I have seen the card fail to open when it is sleeping; the retry has
+        been successful, though.  So, the retry is important.
         """
         is_i2c = 'i2c' in self.port_name
 
