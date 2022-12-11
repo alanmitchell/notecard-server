@@ -5,10 +5,8 @@ from bottle import run, request, post
 import blues
 
 nCard = blues.Notecard(
-    0.5, 
-    '/dev/ttyUSB0',
-    "com.gmail.tabb99:test",
-    'Okla511'
+    "hub project here",
+    'device idenfier'
     )
 
 @post('/minimon')

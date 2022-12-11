@@ -14,12 +14,18 @@ import notecard
 
 class Notecard:
 
-    def __init__(self, upload_period, port_name, product_uid, sn_string):
-        """upload_period:  amount of time in minutes between uploads to Note Hub.
+    def __init__(self, 
+        product_uid, 
+        sn_string,
+        port_name='/dev/i2c-1',
+        upload_period=60.0
+        ):
+        """product_uid:  The Product UID on Note Hub where the data should go.
+        sn_string:  the serial number string that identifies this Notecard, you create it.
+
+        upload_period:  amount of time in minutes between uploads to Note Hub.
                               Readings are batched in between uploads.
         port_name:   e.g. '/dev/ttyUSB0' or '/dev/i2c-1'
-        product_uid:  The Product UID on Note Hub where the data should go.
-        sn_string:  the serial number string that identifies this Notecard, you create it.
         """
 
         self.port_name = port_name
@@ -112,8 +118,6 @@ class Notecard:
         Note Hub.
         Calling routine is responsible for handling errors.
         """
-        print('uploading...')
-
         card = self.open_card()
 
         # Determine whether a time adjustment should be made for the readings.
@@ -123,6 +127,7 @@ class Notecard:
         # by this computer, so all of the readings have a time problem.
         cur_notecard_time = card.Transaction({'req': 'card.time'})['time']
         time_adj = cur_notecard_time - time.time()
+        print(f'Uploading.  Time offset {time_adj:.1f} seconds.')
 
         # only adjust time if it is off by more than 5 seconds
         if abs(time_adj) < 5:
