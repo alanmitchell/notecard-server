@@ -10,7 +10,7 @@ import blues
 # First command line argument is required and must give a path to a settings file.
 # Path to config file
 config_file = Path(sys.argv[1])
-config_dir = config_file.parent
+config_dir = str(config_file.parent)
 if config_dir != '.':
     sys.path.insert(0, config_dir)
 settings = import_module(config_file.stem)
