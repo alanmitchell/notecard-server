@@ -136,8 +136,8 @@ class Notecard:
         time_adj = cur_notecard_time - time.time()
         print(f'Uploading.  Time offset {time_adj:.1f} seconds.')
 
-        # only adjust time if it is off by more than 5 seconds
-        if abs(time_adj) < 5:
+        # only adjust time if it is off by more than 10 seconds
+        if abs(time_adj) < 10:
             time_adj = 0.0
 
         readings = []
