@@ -18,14 +18,18 @@ class Notecard:
         product_uid, 
         sn_string,
         port_name='/dev/i2c-1',
-        upload_period=60.0
+        upload_period=60.0,
+        destinations='',
         ):
         """product_uid:  The Product UID on Note Hub where the data should go.
         sn_string:  the serial number string that identifies this Notecard, you create it.
-
-        upload_period:  amount of time in minutes between uploads to Note Hub.
-                              Readings are batched in between uploads.
         port_name:   e.g. '/dev/ttyUSB0' or '/dev/i2c-1'
+        upload_period:  amount of time in minutes between uploads to Note Hub.
+            Readings are batched in between uploads.
+        destinations:  string indicating where the data should be sent after
+            arriving at the Note Hub.  For multiple destinations, separate with
+            commas.  If this string is left empty, the data will Route from Notehub
+            to the default destination.
         """
 
         self.port_name = port_name
@@ -50,6 +54,9 @@ class Notecard:
                 print("Couldn't complete Notecard setup. Retrying...", e)
                 # try again
                 time.sleep(3)
+
+        # save the string indicating the ultimate destinations of the data.
+        self.destinations = destinations
 
         # The time between requesting a Notecard sync to upload sensor readings.
         # The units are minutes.
@@ -146,7 +153,11 @@ class Notecard:
 
         req = dict(
             req = 'note.add',
-            body = {'reading_type': 'ts_id_val', 'readings': reads_b64}
+            body = {
+                'reading_type': 'ts_id_val_bz2',
+                'destinations': self.destinations,
+                'readings': reads_b64,
+                }
         )
         resp = card.Transaction(req)
         print(resp)
