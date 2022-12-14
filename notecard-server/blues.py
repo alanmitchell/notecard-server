@@ -50,9 +50,6 @@ class Notecard:
                 # try again
                 time.sleep(3)
 
-        # save the string indicating the ultimate destinations of the data.
-        self.destinations = destinations
-
         # The time between requesting a Notecard sync to upload sensor readings.
         # The units are minutes.
         self.upload_period = upload_period
