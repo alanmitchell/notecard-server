@@ -19,17 +19,12 @@ class Notecard:
         sn_string,
         port_name='/dev/i2c-1',
         upload_period=60.0,
-        destinations='',
         ):
         """product_uid:  The Product UID on Note Hub where the data should go.
         sn_string:  the serial number string that identifies this Notecard, you create it.
         port_name:   e.g. '/dev/ttyUSB0' or '/dev/i2c-1'
         upload_period:  amount of time in minutes between uploads to Note Hub.
             Readings are batched in between uploads.
-        destinations:  string indicating where the data should be sent after
-            arriving at the Note Hub.  For multiple destinations, separate with
-            commas.  If this string is left empty, the data will Route from Notehub
-            to the default destination.
         """
 
         self.port_name = port_name
@@ -155,7 +150,6 @@ class Notecard:
             req = 'note.add',
             body = {
                 'reading_type': 'ts_id_val_bz2',
-                'destinations': self.destinations,
                 'readings': reads_b64,
                 }
         )
