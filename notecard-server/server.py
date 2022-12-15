@@ -34,4 +34,4 @@ def mini_data():
         nCard.add_sensor_reading(ts, sensor_id, val)
     return f"{len(payload['readings'])}\n"
 
-run(host='localhost', port=5000, debug=True)
+run(host='localhost', port=5000, debug=False)
