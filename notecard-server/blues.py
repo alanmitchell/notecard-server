@@ -104,11 +104,12 @@ class Notecard:
 
     def upload_timer(self):
         """Runs in a separate thread and triggers an upload once self.upload_period
-        expires, if there are sensor readings to upload.
+        expires.
         """
         while True:
-            if time.time() >= self.next_upload and not self.q.empty():
-                while True:
+            if time.time() >= self.next_upload:
+                # try twice
+                for i in range(2):
                     try:
                         self.upload()
                         self.next_upload = time.time() + self.upload_period * 60.0
@@ -122,7 +123,8 @@ class Notecard:
 
     def upload(self):
         """Create a Note containting all the queued readings and uploads to the
-        Note Hub.
+        Note Hub.  Also, this method updates computer time if requested and the clock
+        has error more than 10 seconds.
         Calling routine is responsible for handling errors.
         """
         card = self.open_card()
@@ -148,6 +150,9 @@ class Notecard:
                     subprocess.run([f'sudo date -u -s "{new_dt}"'], shell=True)
                     print(f'Set computer time to {new_dt} UTC.')
 
+        if self.q.empty():
+            # no readings to upload
+            return
 
         print(f'Uploading.  Time offset {time_adj:.1f} seconds.')
 
