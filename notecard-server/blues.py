@@ -6,6 +6,8 @@ import threading
 import time
 import base64
 import bz2
+import datetime
+import subprocess
 
 import serial
 from periphery import I2C
@@ -19,20 +21,33 @@ class Notecard:
         sn_string,
         port_name='/dev/i2c-1',
         upload_period=60.0,
+        set_time=True,
         ):
         """product_uid:  The Product UID on Note Hub where the data should go.
         sn_string:  the serial number string that identifies this Notecard, you create it.
         port_name:   e.g. '/dev/ttyUSB0' or '/dev/i2c-1'
         upload_period:  amount of time in minutes between uploads to Note Hub.
             Readings are batched in between uploads.
+        set_time: if True, used the time on the Notecard to set the computer time after
+            Notecard uploads if it differs noticeably from Notecard time.
         """
 
         self.port_name = port_name
+        self.set_time = set_time
 
         # Set the mode and other startup parameters on the Notecard
         while True:
             try:
                 card = self.open_card()
+
+                # set to factory defaults
+                req = dict(
+                    req = 'card.restore',
+                    delete = True
+                )
+                card.Transaction(req)
+
+                # set necessary configuration
                 req = dict(
                     req = 'hub.set',
                     product = product_uid,
@@ -124,13 +139,24 @@ class Notecard:
         # connectivity.
         # Note that this code assumes that all the sensor readings were time-stamped
         # by this computer, so all of the readings have a time problem.
-        cur_notecard_time = card.Transaction({'req': 'card.time'})['time']
-        time_adj = cur_notecard_time - time.time()
-        print(f'Uploading.  Time offset {time_adj:.1f} seconds.')
+        time_adj = 0.0
+        resp = card.Transaction({'req': 'card.time'})
+        if 'time' in resp:
+            cur_notecard_time = resp['time']
+            time_adj = cur_notecard_time - time.time()
 
-        # only adjust time if it is off by more than 10 seconds
-        if abs(time_adj) < 10:
-            time_adj = 0.0
+            # only adjust time if it is off by more than 10 seconds
+            if abs(time_adj) < 10:
+                time_adj = 0.0
+            else:
+                # if requested also correct computer time
+                if self.set_time:
+                    new_dt = datetime.datetime.utcfromtimestamp(cur_notecard_time).strftime('%Y-%m-%d %H:%M:%S')
+                    subprocess.run([f'sudo date -u -s "{new_dt}"'], shell=True)
+                    print(f'Set computer time to {new_dt} UTC.')
+
+
+        print(f'Uploading.  Time offset {time_adj:.1f} seconds.')
 
         readings = []
         while not self.q.empty():

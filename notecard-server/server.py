@@ -24,6 +24,8 @@ if hasattr(settings ,'NOTECARD_PORT_NAME'):
     param['port_name'] = settings.NOTECARD_PORT_NAME
 if hasattr(settings, 'NOTECARD_UPLOAD_PERIOD'):
     param['upload_period'] = settings.NOTECARD_UPLOAD_PERIOD
+if hasattr(settings, 'NOTECARD_SET_TIME'):
+    param['set_time'] = settings.NOTECARD_SET_TIME
 
 nCard = blues.Notecard(**param)
 
