@@ -40,13 +40,6 @@ class Notecard:
             try:
                 card = self.open_card()
 
-                # set to factory defaults
-                req = dict(
-                    req = 'card.restore',
-                    delete = True
-                )
-                card.Transaction(req)
-
                 # set necessary configuration
                 req = dict(
                     req = 'hub.set',
